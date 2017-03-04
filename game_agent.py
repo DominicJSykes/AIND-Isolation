@@ -41,6 +41,25 @@ def custom_score(game, player):
     
     return value
 
+def expand_tree(game,depth,player):
+    score = -1
+    depth = depth - 1
+        
+    for i in game.get_legal_moves():
+        new_game = game.forecast_move(i)
+        if (depth > 0):
+            next_score, _ = expand_tree(new_game,depth,player)
+            if next_score > score:
+                score = next_score
+                move = i
+        else:
+            new_score = player.score(new_game,player)            
+            if new_score > score:
+                score = new_score
+                move = i
+    return score, move
+    
+
 class CustomPlayer:
     """Game-playing agent that chooses a move using your evaluation function
     and a depth-limited minimax algorithm with alpha-beta pruning. You must
@@ -118,7 +137,6 @@ class CustomPlayer:
         """
 
         self.time_left = time_left
-        self.legal_moves = legal_moves
 
         # TODO: finish this function!
 
@@ -128,22 +146,21 @@ class CustomPlayer:
         
         if (len(self.legal_moves) == 0):
             return
-
-        try:
-            
-            # The search method call (alpha beta or minimax) should happen in
-            # here in order to avoid timeout. The try/except block will
-            # automatically catch the exception raised by the search method
-            # when the timer gets close to expiring
-            pass
-
-        except Timeout:
-            # Handle any actions required at timeout, if necessary
-            pass
+        
+        if (self.iterative):
+            i = 0
+            while self.search_depth < 0:
+                try:
+                    i += 1
+                    score, move = self.minimax(game, i + 1)
+                except Timeout:
+                    print ("I")
+                    self.search_depth = 1
+        else:
+            score, move = self.minimax(game, self.search_depth)
 
         # Return the best move from the last completed search iteration
-        
-        score, move = self.minimax(self, game, self.search_depth)
+            
         return move
 
     def minimax(self, game, depth, maximizing_player=True):
@@ -178,11 +195,10 @@ class CustomPlayer:
                 evaluation function directly.
         """
         
-        score = self.score(game,self)
-        move = self.legal_moves[0]
-        
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
+            
+        score, move = expand_tree(game,depth,self)
         
         return score,move
 
