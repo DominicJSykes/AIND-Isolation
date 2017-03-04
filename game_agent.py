@@ -152,9 +152,8 @@ class CustomPlayer:
             while self.search_depth < 0:
                 try:
                     i += 1
-                    score, move = self.minimax(game, i + 1)
+                    score, move = self.minimax(game, i)
                 except Timeout:
-                    print ("I")
                     self.search_depth = 1
         else:
             score, move = self.minimax(game, self.search_depth)
