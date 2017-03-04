@@ -36,10 +36,10 @@ def custom_score(game, player):
     float
         The heuristic value of the current game state to the specified player.
     """
-
-    # TODO: finish this function!
-    raise NotImplementedError
-
+    #test value is 5.0
+    value = 5.0
+    
+    return value
 
 class CustomPlayer:
     """Game-playing agent that chooses a move using your evaluation function
@@ -79,6 +79,7 @@ class CustomPlayer:
         self.method = method
         self.time_left = None
         self.TIMER_THRESHOLD = timeout
+        self.legal_moves = (0,0)
 
     def get_move(self, game, legal_moves, time_left):
         """Search for the best move from the available legal moves and return a
@@ -117,14 +118,19 @@ class CustomPlayer:
         """
 
         self.time_left = time_left
+        self.legal_moves = legal_moves
 
         # TODO: finish this function!
 
         # Perform any required initializations, including selecting an initial
         # move from the game board (i.e., an opening book), or returning
         # immediately if there are no legal moves
+        
+        if (len(self.legal_moves) == 0):
+            return
 
         try:
+            
             # The search method call (alpha beta or minimax) should happen in
             # here in order to avoid timeout. The try/except block will
             # automatically catch the exception raised by the search method
@@ -136,7 +142,9 @@ class CustomPlayer:
             pass
 
         # Return the best move from the last completed search iteration
-        raise NotImplementedError
+        
+        score, move = self.minimax(self, game, self.search_depth)
+        return move
 
     def minimax(self, game, depth, maximizing_player=True):
         """Implement the minimax search algorithm as described in the lectures.
@@ -169,11 +177,14 @@ class CustomPlayer:
                 to pass the project unit tests; you cannot call any other
                 evaluation function directly.
         """
+        
+        score = self.score(game,self)
+        move = self.legal_moves[0]
+        
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
-
-        # TODO: finish this function!
-        raise NotImplementedError
+        
+        return score,move
 
     def alphabeta(self, game, depth, alpha=float("-inf"), beta=float("inf"), maximizing_player=True):
         """Implement minimax search with alpha-beta pruning as described in the
@@ -215,6 +226,8 @@ class CustomPlayer:
         """
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
+            
+        score = self.score(game,self)
+        move = self.legal_moves[0]
 
-        # TODO: finish this function!
-        raise NotImplementedError
+        return score,move        
