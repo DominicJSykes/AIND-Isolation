@@ -43,22 +43,53 @@ def custom_score(game, player):
 
 def expand_tree(game,depth,player):
     score = -1
+    original_depth = depth
     depth = depth - 1
         
     for i in game.get_legal_moves():
         new_game = game.forecast_move(i)
         if (depth > 0):
             next_score, _ = expand_tree(new_game,depth,player)
-            if next_score > score:
+            if next_score > score and (original_depth - depth) % 2 == 1:
+                score = next_score
+                move = i
+            if next_score < score and (original_depth - depth) % 2 == 0:
                 score = next_score
                 move = i
         else:
-            new_score = player.score(new_game,player)            
-            if new_score > score:
+            new_score = player.score(new_game,player)    
+            if new_score > score and original_depth % 2 == 1:
+                score = new_score
+                move = i
+            if new_score < score and original_depth % 2 == 0:
                 score = new_score
                 move = i
     return score, move
-    
+
+def expand_tree_pruned(game,depth,player,alpha,beta):
+    score = -1
+    original_depth = depth
+    depth = depth - 1
+        
+    for i in game.get_legal_moves():
+        new_game = game.forecast_move(i)
+        if (depth > 0):
+            next_score, _ = expand_tree(new_game,depth,player)
+            if next_score > score and (original_depth - depth) % 2 == 1:
+                score = next_score
+                move = i
+            if next_score < score and (original_depth - depth) % 2 == 0:
+                score = next_score
+                move = i
+        else:
+            new_score = player.score(new_game,player)    
+            if new_score > score and original_depth % 2 == 1:
+                score = new_score
+                move = i
+            if new_score < score and original_depth % 2 == 0:
+                score = new_score
+                move = i
+    return score, move
 
 class CustomPlayer:
     """Game-playing agent that chooses a move using your evaluation function
@@ -242,7 +273,6 @@ class CustomPlayer:
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
             
-        score = self.score(game,self)
-        move = self.legal_moves[0]
+        score, move = expand_tree_pruned(game,depth,self,alpha,beta)
 
         return score,move        
