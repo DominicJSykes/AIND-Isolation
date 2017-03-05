@@ -41,6 +41,44 @@ def custom_score(game, player):
     
     return value
 
+def backup_expand_tree(game,depth,player,alpha,beta):
+    original_depth = depth
+    depth = depth - 1
+    if (original_depth - depth) % 2 == 1:
+        score = float("-inf")
+    if (original_depth - depth) % 2 == 0:
+        score = float("inf")      
+        
+    for i in game.get_legal_moves():
+        new_game = game.forecast_move(i)
+        if (depth > 0):
+            next_score, _ = backup_expand_tree(new_game,depth,player,alpha,beta)
+            if next_score > score and (original_depth - depth) % 2 == 1:
+                score = next_score
+                move = i
+            if next_score < score and (original_depth - depth) % 2 == 0:
+                score = next_score
+                move = i
+            if score < alpha and (original_depth - depth) % 2 == 0:
+                return score, move
+            if score < beta and (original_depth - depth) % 2 == 0:
+                beta = score
+            if score > alpha and (original_depth - depth) % 2 == 0:
+                alpha = score
+        else:
+            new_score = player.score(new_game,player)   
+            if new_score > score and original_depth % 2 == 1:
+                score = new_score
+                move = i
+            if alpha > score and original_depth % 2 == 1:
+                alpha = score
+            if new_score < score and original_depth % 2 == 0:
+                score = new_score
+                move = i
+            if score > beta and original_depth % 2 == 1:
+                return score, move
+    return score, move
+
 def expand_tree(game,depth,player):
     score = -1
     original_depth = depth
@@ -48,7 +86,7 @@ def expand_tree(game,depth,player):
         
     for i in game.get_legal_moves():
         new_game = game.forecast_move(i)
-        if (depth > 0):
+        if depth > 0:
             next_score, _ = expand_tree(new_game,depth,player)
             if next_score > score and (original_depth - depth) % 2 == 1:
                 score = next_score
@@ -66,29 +104,86 @@ def expand_tree(game,depth,player):
                 move = i
     return score, move
 
-def expand_tree_pruned(game,depth,player,alpha,beta):
-    score = -1
-    original_depth = depth
-    depth = depth - 1
-        
+def max_value(game,depth,player,score,move):
+    if player.time_left() < player.TIMER_THRESHOLD:
+        raise Timeout() 
+    if len(game.get_legal_moves()) == 0:
+        return score, None
+    depth -= 1
+    
     for i in game.get_legal_moves():
         new_game = game.forecast_move(i)
-        if (depth > 0):
-            next_score, _ = expand_tree(new_game,depth,player)
-            if next_score > score and (original_depth - depth) % 2 == 1:
-                score = next_score
-                move = i
-            if next_score < score and (original_depth - depth) % 2 == 0:
-                score = next_score
-                move = i
+        if depth > 0:
+            new_score, _ = min_value(new_game,depth,player,float("inf"),move)
         else:
-            new_score = player.score(new_game,player)    
-            if new_score > score and original_depth % 2 == 1:
-                score = new_score
-                move = i
-            if new_score < score and original_depth % 2 == 0:
-                score = new_score
-                move = i
+            new_score = player.score(new_game,player)
+        if new_score > score:
+            score = new_score
+            move = i
+                
+    return score, move
+
+def min_value(game,depth,player,score,move): 
+    if player.time_left() < player.TIMER_THRESHOLD:
+        raise Timeout() 
+    if len(game.get_legal_moves()) == 0:
+        return score, None
+    depth -= 1   
+    
+    for i in game.get_legal_moves():
+        new_game = game.forecast_move(i)
+        if depth > 0:
+            new_score, _ = max_value(new_game,depth,player,float("-inf"),move)
+        else:
+            new_score = player.score(new_game,player)
+        if new_score < score:
+            score = new_score
+            move = i
+    
+    return score, move
+
+def max_value_ab(game,depth,player,alpha,beta,score,move):
+    if player.time_left() < player.TIMER_THRESHOLD:
+        raise Timeout() 
+    if len(game.get_legal_moves()) == 0:
+        return score, None
+    depth -= 1  
+    
+    for i in game.get_legal_moves():
+        new_game = game.forecast_move(i)
+        if depth > 0:
+            new_score, _ = min_value_ab(new_game,depth,player,alpha,beta,float("inf"),move)
+        else:
+            new_score = player.score(new_game,player)
+        if new_score > score:
+            score = new_score
+            move = i
+        if score >= beta:
+            return score, move
+        alpha = max(alpha, score)
+        
+    return score, move
+
+def min_value_ab(game,depth,player,alpha,beta,score,move):
+    if player.time_left() < player.TIMER_THRESHOLD:
+        raise Timeout() 
+    if len(game.get_legal_moves()) == 0:
+        return score, None
+    depth -= 1
+    
+    for i in game.get_legal_moves():
+        new_game = game.forecast_move(i)
+        if depth > 0:
+            new_score, _ = max_value_ab(new_game,depth,player,alpha,beta,float("-inf"),move)
+        else:
+            new_score = player.score(new_game,player)
+        if new_score < score:
+            score = new_score
+            move = i
+        if score <= alpha:
+            return score, move
+        beta = min(beta, score)
+       
     return score, move
 
 class CustomPlayer:
@@ -166,7 +261,7 @@ class CustomPlayer:
             Board coordinates corresponding to a legal move; may return
             (-1, -1) if there are no available legal moves.
         """
-
+        
         self.time_left = time_left
 
         # TODO: finish this function!
@@ -176,19 +271,22 @@ class CustomPlayer:
         # immediately if there are no legal moves
         
         if (len(self.legal_moves) == 0):
-            return
+            return (-1,-1)
         
-        if (self.iterative):
-            i = 0
-            while self.search_depth < 0:
+        if self.iterative:
+            for i in range(100):
                 try:
-                    i += 1
-                    score, move = self.minimax(game, i)
+                    if self.method == 'minimax':
+                        score, move = self.minimax(game, i + 1)
+                    else:
+                        score, move = self.alphabeta(game, i + 1)
                 except Timeout:
-                    self.search_depth = 1
+                    pass
         else:
-            score, move = self.minimax(game, self.search_depth)
-
+            if self.method == 'minimax': 
+                score, move = self.minimax(game, self.search_depth)
+            else:
+                score, move = self.alphabeta(game, self.search_depth)
         # Return the best move from the last completed search iteration
             
         return move
@@ -226,11 +324,11 @@ class CustomPlayer:
         """
         
         if self.time_left() < self.TIMER_THRESHOLD:
-            raise Timeout()
-            
-        score, move = expand_tree(game,depth,self)
+            raise Timeout()             
+
+        score, move = max_value(game,depth,self,float("-inf"),(-1,-1))
         
-        return score,move
+        return score, move
 
     def alphabeta(self, game, depth, alpha=float("-inf"), beta=float("inf"), maximizing_player=True):
         """Implement minimax search with alpha-beta pruning as described in the
@@ -270,9 +368,10 @@ class CustomPlayer:
                 to pass the project unit tests; you cannot call any other
                 evaluation function directly.
         """
+        
         if self.time_left() < self.TIMER_THRESHOLD:
-            raise Timeout()
-            
-        score, move = expand_tree_pruned(game,depth,self,alpha,beta)
+            raise Timeout() 
+     
+        score, move = max_value_ab(game,depth,self,alpha,beta,float("-inf"),(-1,-1))
 
-        return score,move        
+        return score, move        
