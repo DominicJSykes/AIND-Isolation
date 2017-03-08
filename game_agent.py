@@ -7,12 +7,52 @@ You must test your agent's strength against a set of agents with known
 relative strength using tournament.py and include the results in your report.
 """
 import random
+import numpy as np
 
 
 class Timeout(Exception):
     """Subclass base exception for code clarity."""
     pass
 
+def center_move(game, player, multiplier=1): 
+    location = game.get_player_location(player)
+    cent = [round(game.width/2),round(game.height/2)]
+    max_dist = np.square(cent[0]) + np.square(cent[1])
+    distance_from_center = np.square(location[0]-cent[0]) + np.square(location[1]-cent[1])
+    
+    return float(max_dist - distance_from_center)
+
+def mirror_move(game, player, multiplier=1):
+    location = game.get_player_location(player)
+    opp = game.get_opponent(player)
+    mirror_space = game.get_player_location(opp)
+    distance_from_mirror = float(np.square(location[0]-mirror_space[0]) + np.square(location[1]-mirror_space[1]))
+    
+    return distance_from_mirror
+
+def my_sub_opp_moves_part_check(game, player, multiplier=1):
+    '''Checks for if the move causes a partition and if so who will end up
+    with the most moves. 
+    Returns the highest score for a player win, and the lowest for an opponent
+    win'''
+    my_moves = game.get_legal_moves(player)
+    opp = game.get_opponent(player)
+    opp_moves = game.get_legal_moves(opp)
+    partition_set = set(my_moves + opp_moves)
+    if (len(partition_set) == len(my_moves) + len(opp_moves)):
+        if (len(my_moves) > len(opp_moves)):
+            return 100.0
+        else:
+            return 0.0
+    
+    return len(my_moves) - multiplier * len(opp_moves)
+
+def my_sub_opp_moves(game, player, multiplier=1):
+    my_moves = len(game.get_legal_moves(player))
+    opp = game.get_opponent(player)
+    opp_moves = len(game.get_legal_moves(opp))
+    
+    return float(my_moves - multiplier * opp_moves)
 
 def custom_score(game, player):
     """Calculate the heuristic value of a game state from the point of view
@@ -35,9 +75,9 @@ def custom_score(game, player):
     -------
     float
         The heuristic value of the current game state to the specified player.
-    """
-    #test value is 5.0
-    value = 5.0
+    """    
+    
+    value = center_move(game,player)
     
     return value
 
@@ -107,6 +147,7 @@ def expand_tree(game,depth,player):
 def max_value(game,depth,player,score,move):
     if player.time_left() < player.TIMER_THRESHOLD:
         raise Timeout() 
+        
     if len(game.get_legal_moves()) == 0:
         return score, None
     depth -= 1
@@ -123,9 +164,7 @@ def max_value(game,depth,player,score,move):
                 
     return score, move
 
-def min_value(game,depth,player,score,move): 
-    if player.time_left() < player.TIMER_THRESHOLD:
-        raise Timeout() 
+def min_value(game,depth,player,score,move):      
     if len(game.get_legal_moves()) == 0:
         return score, None
     depth -= 1   
@@ -142,9 +181,10 @@ def min_value(game,depth,player,score,move):
     
     return score, move
 
-def max_value_ab(game,depth,player,alpha,beta,score,move):
+def max_value_ab(game,depth,player,alpha,beta,score,move):   
     if player.time_left() < player.TIMER_THRESHOLD:
-        raise Timeout() 
+        raise Timeout()  
+          
     if len(game.get_legal_moves()) == 0:
         return score, None
     depth -= 1  
@@ -164,9 +204,7 @@ def max_value_ab(game,depth,player,alpha,beta,score,move):
         
     return score, move
 
-def min_value_ab(game,depth,player,alpha,beta,score,move):
-    if player.time_left() < player.TIMER_THRESHOLD:
-        raise Timeout() 
+def min_value_ab(game,depth,player,alpha,beta,score,move):               
     if len(game.get_legal_moves()) == 0:
         return score, None
     depth -= 1
@@ -274,19 +312,34 @@ class CustomPlayer:
             return (-1,-1)
         
         if self.iterative:
-            for i in range(100):
+            count = 0
+            while True:
                 try:
+                    count += 1
                     if self.method == 'minimax':
-                        score, move = self.minimax(game, i + 1)
+                        score, move = self.minimax(game, count)
                     else:
-                        score, move = self.alphabeta(game, i + 1)
+                        score, move = self.alphabeta(game, count)
                 except Timeout:
-                    pass
+                    if self.time_left() < 0.1:
+                        print (self.method)
+                        print (self.iterative)
+                        print (self.search_depth)
+                        print (self.time_left())
+                    break
         else:
-            if self.method == 'minimax': 
-                score, move = self.minimax(game, self.search_depth)
-            else:
-                score, move = self.alphabeta(game, self.search_depth)
+            try:
+                if self.method == 'minimax': 
+                    score, move = self.minimax(game, self.search_depth)
+                else:
+                    score, move = self.alphabeta(game, self.search_depth)
+            except Timeout:
+                if self.time_left():
+                    print (self.method)
+                    print (self.iterative)
+                    print (self.search_depth)
+                    print (self.time_left())    
+                return self.legal_moves[0]
         # Return the best move from the last completed search iteration
             
         return move
@@ -321,10 +374,7 @@ class CustomPlayer:
             (1) You MUST use the `self.score()` method for board evaluation
                 to pass the project unit tests; you cannot call any other
                 evaluation function directly.
-        """
-        
-        if self.time_left() < self.TIMER_THRESHOLD:
-            raise Timeout()             
+        """           
 
         score, move = max_value(game,depth,self,float("-inf"),(-1,-1))
         
@@ -368,9 +418,6 @@ class CustomPlayer:
                 to pass the project unit tests; you cannot call any other
                 evaluation function directly.
         """
-        
-        if self.time_left() < self.TIMER_THRESHOLD:
-            raise Timeout() 
      
         score, move = max_value_ab(game,depth,self,alpha,beta,float("-inf"),(-1,-1))
 
