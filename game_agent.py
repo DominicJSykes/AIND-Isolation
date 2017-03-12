@@ -14,7 +14,15 @@ class Timeout(Exception):
     """Subclass base exception for code clarity."""
     pass
 
+def mixes_heuristic(game, player, multiplier=1):
+    '''Depe'''
+    pass
+
 def center_move(game, player, multiplier=1): 
+    '''Attempts to keep the agent nearest the center of the board so as to maximise
+    potential future moves.
+    Returns score dependent on how close to center the agent is.
+    This heuristic gives rise to behaviour that is agnostic to the opponents behaviour'''
     location = game.get_player_location(player)
     cent = [round(game.width/2),round(game.height/2)]
     max_dist = np.square(cent[0]) + np.square(cent[1])
@@ -23,18 +31,55 @@ def center_move(game, player, multiplier=1):
     return float(max_dist - distance_from_center)
 
 def mirror_move(game, player, multiplier=1):
+    '''Will attempt to mirror the opponents positioning in one of 4 lines of 
+    reflection.
+    This is a heuristic gives rise to defensive behaviour as the agent seeks to counter
+    the opponents moves'''
+    max_dist = np.square(game.height) + np.square(game.width)
     location = game.get_player_location(player)
     opp = game.get_opponent(player)
-    mirror_space = game.get_player_location(opp)
-    distance_from_mirror = float(np.square(location[0]-mirror_space[0]) + np.square(location[1]-mirror_space[1]))
+    opp_location = game.get_player_location(opp)
+    if(opp_location[0] != int(game.height / 2)):
+        hori = (game.width - 1 - opp_location[0],opp_location[1])
+        if hori == location:
+            return float(max_dist * 2)
+    if(opp_location[1] != int(game.width / 2)):
+        vert = (opp_location[0],6-opp_location[1])
+        if vert == location:
+            return float(max_dist * 2)
+    if(opp_location[0] != opp_location[1]):
+        diag_one = (opp_location[1],opp_location[0])
+        if diag_one == location:
+            return float(max_dist * 2)
+    if((game.width - 1 - opp_location[0]) != opp_location[1]):
+        diag_two = (game.width - 1 - opp_location[1],opp_location[0])
+        if diag_two == location:
+            return float(max_dist * 2)   
+    try:
+        hori_dist = np.square(location[0]-hori[0]) + np.square(location[1]-hori[1]) 
+    except:
+        hori_dist = max_dist
+    try:
+        vert_dist = np.square(location[0]-vert[0]) + np.square(location[1]-vert[1])
+    except:
+        vert_dist = max_dist
+    try:
+        diag_one_dist = np.square(location[0]-diag_one[0]) + np.square(location[1]-diag_one[1])
+    except:
+        diag_one_dist = max_dist
+    try:
+        diag_two_dist = np.square(location[0]-diag_two[0]) + np.square(location[1]-diag_two[1])
+    except:        
+        diag_two_dist = max_dist
     
-    return distance_from_mirror
+    return float(max_dist - min(hori_dist,vert_dist,diag_one_dist,diag_two_dist))
 
 def my_sub_opp_moves_part_check(game, player, multiplier=1):
     '''Checks for if the move causes a partition and if so who will end up
     with the most moves. 
     Returns the highest score for a player win, and the lowest for an opponent
-    win'''
+    win
+    '''
     my_moves = game.get_legal_moves(player)
     opp = game.get_opponent(player)
     opp_moves = game.get_legal_moves(opp)
@@ -48,6 +93,10 @@ def my_sub_opp_moves_part_check(game, player, multiplier=1):
     return len(my_moves) - multiplier * len(opp_moves)
 
 def my_sub_opp_moves(game, player, multiplier=1):
+    '''Attempts to maximise the agents moves in addition to minimising the opponents
+    moves.
+    This heuristic gives rise to agressive behaviour as the agent actively looks to cut 
+    off the opponent'''
     my_moves = len(game.get_legal_moves(player))
     opp = game.get_opponent(player)
     opp_moves = len(game.get_legal_moves(opp))
@@ -77,7 +126,7 @@ def custom_score(game, player):
         The heuristic value of the current game state to the specified player.
     """    
     
-    value = center_move(game,player)
+    value = mirror_move(game,player)
     
     return value
 
@@ -322,10 +371,7 @@ class CustomPlayer:
                         score, move = self.alphabeta(game, count)
                 except Timeout:
                     if self.time_left() < 0.1:
-                        print (self.method)
-                        print (self.iterative)
-                        print (self.search_depth)
-                        print (self.time_left())
+                        print ("Timeout Iterative")
                     break
         else:
             try:
@@ -335,10 +381,7 @@ class CustomPlayer:
                     score, move = self.alphabeta(game, self.search_depth)
             except Timeout:
                 if self.time_left():
-                    print (self.method)
-                    print (self.iterative)
-                    print (self.search_depth)
-                    print (self.time_left())    
+                    print ("Timeout Not Iterative")  
                 return self.legal_moves[0]
         # Return the best move from the last completed search iteration
             
